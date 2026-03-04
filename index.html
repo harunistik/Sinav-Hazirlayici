@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sınav Kağıdı Hazırlayıcı - Dinamik Yeniden Dizgi</title>
+    <style>
+        :root {
+            --soru-bosluk: 1.5cm;
+        }
+
+        /* --- Arayüz Ayarları --- */
+        body { font-family: Arial, sans-serif; background-color: #444; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .controls { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 30px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; justify-content: center; width: 100%; max-width: 900px; position: sticky; top: 10px; z-index: 1000; }
+        .controls input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
+        .controls input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 60px; }
+        .controls .setting-group { display: flex; align-items: center; gap: 5px; font-weight: bold; font-size: 14px; color: #333; }
+        .controls button { padding: 10px 15px; background-color: #f38220; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        .controls button:hover { background-color: #d66f15; }
+        .controls .clear-btn { background-color: #dc3545; }
+        .controls .clear-btn:hover { background-color: #c82333; }
+        
+        /* Yükleniyor Uyarısı */
+        #loadingIndicator { display: none; color: #f38220; font-weight: bold; margin-left: 10px; }
+
+        /* --- Sınav Kağıdı Konteyneri --- */
+        #examContainer { display: flex; flex-direction: column; gap: 40px; width: 210mm; }
+
+        .paper { background: white; width: 210mm; height: 297mm; max-height: 297mm; padding: 15mm 15mm 10mm 15mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); box-sizing: border-box; display: flex; flex-direction: column; position: relative; margin: 0 auto; overflow: hidden; }
+        .header-box { border: 2px solid #f38220; border-radius: 12px; overflow: hidden; margin-bottom: 8mm; flex-shrink: 0; }
+        .header-top { background-color: #f38220; padding: 6px; text-align: center; }
+        .header-top h1 { margin: 0; font-size: 16px; font-weight: bold; color: black; }
+        .header-bottom { padding: 8px 15px; background-color: white; }
+        .header-bottom p { margin: 0; font-size: 14px; font-weight: bold; color: #000; }
+        .content-wrapper { flex: 1; display: flex; position: relative; height: 100%; max-height: 100%; }
+        .content-wrapper::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: #f38220; transform: translateX(-50%); z-index: 1; }
+        .column { width: 50%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; }
+        .left-column { padding-right: 10mm; box-sizing: border-box; }
+        .right-column { padding-left: 10mm; box-sizing: border-box; }
+        .question-item { margin-bottom: var(--soru-bosluk); display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
+        .question-number { font-weight: bold; font-size: 14px; min-width: 20px; padding-top: 2px; }
+        .question-image { flex: 1; }
+        .question-image img { max-width: 100%; max-height: 220mm; object-fit: contain; display: block; }
+        .footer { 
+            border-top: 1.5px solid #f38220; 
+            position: relative; 
+            margin-top: auto; 
+            padding-top: 10px; 
+            text-align: center; 
+            flex-shrink: 0; 
+            z-index: 2; /* Dikey çizginin üst katmanına çıkarır */
+        }
+        
+        .page-number { 
+            position: absolute; 
+            top: -16px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            background: white; 
+            border: 1.5px solid #f38220; 
+            border-radius: 50%; 
+            width: 30px; 
+            height: 30px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: bold; 
+            color: #f38220; 
+            font-size: 14px; 
+            z-index: 3; /* Çizgiyi beyaz arka planıyla ezer */
+        }
+
+        @media print {
+            body { background: white; margin: 0; padding: 0; align-items: flex-start; }
+            .controls { display: none; }
+            #examContainer { gap: 0; }
+            .paper { box-shadow: none; margin: 0; width: 210mm; height: 297mm; page-break-after: always; }
+            .paper:last-child { page-break-after: auto; }
+            @page { size: A4; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls no-print">
+        <input type="text" id="examTitle" placeholder="Üst Başlık (Örn: 6.SINIF 2.DENEME)">
+        <input type="text" id="creatorName" placeholder="Alt Bilgi (Örn: HLT Matematik)">
+        <div class="setting-group">
+            Boşluk(cm): <input type="number" id="spacingInput" value="1.5" step="0.5" min="0">
+        </div>
+        <input type="file" id="imageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+        <button onclick="window.print()">PDF Olarak Çıktı Al</button>
+        <button class="clear-btn" onclick="clearAll()">Tümünü Temizle</button>
+        <span id="loadingIndicator">Yeniden Hesaplanıyor...</span>
+    </div>
+
+    <div id="examContainer"></div>
+
+    <script>
+        // SİSTEM HAFIZASI (Eklenen tüm soruları tutar)
+        let uploadedImages = []; 
+        let currentPage = 1;
+        let currentSide = 'left';
+        let isProcessing = false;
+
+        window.onload = () => {
+            document.getElementById('examContainer').appendChild(createPage(1));
+        };
+
+        function createPage(pageNum) {
+            const title = document.getElementById('examTitle').value || '6.SINIF 2.DENEME';
+            const creator = document.getElementById('creatorName').value || 'HLT Matematik';
+            const page = document.createElement('div');
+            page.className = 'paper';
+            page.id = `page-${pageNum}`;
+            page.innerHTML = `
+                <div class="header-box">
+                    <div class="header-top"><h1 class="displayTitle">${title}</h1></div>
+                    <div class="header-bottom"><p class="displayCreator">${creator}</p></div>
+                </div>
+                <div class="content-wrapper">
+                    <div class="column left-column" id="page-${pageNum}-left"></div>
+                    <div class="column right-column" id="page-${pageNum}-right"></div>
+                </div>
+                <div class="footer"><div class="page-number">${pageNum}</div></div>
+            `;
+            return page;
+        }
+
+        // --- GÖRSELLERİ YÜKLEME VE HAFIZAYA ALMA ---
+        document.getElementById('imageUploader').addEventListener('change', async function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            toggleUI(true); // Yükleme sırasında butonları kilitle
+
+            for (let file of files) {
+                if (file.type.startsWith('image/')) {
+                    const imgSrc = await readFileAsDataURL(file);
+                    uploadedImages.push(imgSrc); // Resmi hafızaya al
+                    await placeQuestionInDOM(imgSrc, uploadedImages.length); // Kağıda yerleştir
+                }
+            }
+            
+            this.value = ''; 
+            toggleUI(false);
+        });
+
+        // Dosyayı okuma fonksiyonu
+        function readFileAsDataURL(file) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // --- BOŞLUK DEĞİŞTİĞİNDE YENİDEN HESAPLAMA (RE-RENDER) ---
+        let spacingTimeout;
+        document.getElementById('spacingInput').addEventListener('input', function(e) {
+            const gap = e.target.value || 0;
+            // CSS anında güncellenir (Görsel geri bildirim)
+            document.documentElement.style.setProperty('--soru-bosluk', gap + 'cm');
+            
+            // Eğer resim yoksa hesaplamaya gerek yok
+            if(uploadedImages.length === 0) return;
+
+            // Kullanıcı seri tıklıyorsa sürekli sil-yaz yapmamak için yarım saniye (500ms) bekle
+            clearTimeout(spacingTimeout);
+            spacingTimeout = setTimeout(() => {
+                reRenderExam();
+            }, 500); 
+        });
+
+        // Tüm Sınavı Baştan Yaratma Motoru
+        async function reRenderExam() {
+            if(isProcessing) return;
+            isProcessing = true;
+            document.getElementById('loadingIndicator').style.display = 'inline';
+
+            // Mevcut kağıtları sil ve konumları sıfırla
+            document.getElementById('examContainer').innerHTML = '';
+            currentPage = 1;
+            currentSide = 'left';
+            document.getElementById('examContainer').appendChild(createPage(1));
+
+            // Hafızadaki soruları sırayla yeni kurala göre tekrar diz
+            for (let i = 0; i < uploadedImages.length; i++) {
+                await placeQuestionInDOM(uploadedImages[i], i + 1);
+            }
+
+            document.getElementById('loadingIndicator').style.display = 'none';
+            isProcessing = false;
+        }
+
+        // --- AKILLI YERLEŞTİRME VE TAŞMA KONTROLÜ (DÖNGÜ) ---
+        async function placeQuestionInDOM(imgSrc, qNum) {
+            
+            // Önce resmin tarayıcı belleğine tam oturduğundan emin ol (Ölçüm hatasını önler)
+            await new Promise(resolve => {
+                const tempImg = new Image();
+                tempImg.onload = resolve;
+                tempImg.src = imgSrc;
+            });
+
+            let placed = false;
+
+            while (!placed) {
+                let targetColumn = document.getElementById(`page-${currentPage}-${currentSide}`);
+                
+                if (!targetColumn) {
+                    document.getElementById('examContainer').appendChild(createPage(currentPage));
+                    targetColumn = document.getElementById(`page-${currentPage}-${currentSide}`);
+                }
+
+                const qDiv = document.createElement('div');
+                qDiv.className = 'question-item';
+                qDiv.innerHTML = `
+                    <span class="question-number">${qNum}.</span>
+                    <div class="question-image"><img src="${imgSrc}"></div>
+                `;
+
+                targetColumn.appendChild(qDiv);
+
+                // CSS'in boşlukları ekrana yansıtması için çok kısa bekleme
+                await new Promise(r => setTimeout(r, 20));
+
+                const colRect = targetColumn.getBoundingClientRect();
+                const qRect = qDiv.getBoundingClientRect();
+                
+                const style = window.getComputedStyle(qDiv);
+                const marginBottom = parseFloat(style.marginBottom) || 0;
+
+                // Taşma kontrolü
+                if ((qRect.bottom + marginBottom) > colRect.bottom + 5) {
+                    if (targetColumn.children.length === 1) {
+                        placed = true;
+                        advancePagePointer();
+                    } else {
+                        targetColumn.removeChild(qDiv); // Sığmadı, geri al
+                        advancePagePointer(); // Sonraki sütuna/sayfaya geç ve döngüyle tekrar dene
+                    }
+                } else {
+                    placed = true; // Sığdı
+                }
+            }
+        }
+
+        function advancePagePointer() {
+            if (currentSide === 'left') {
+                currentSide = 'right'; 
+            } else {
+                currentPage++; 
+                currentSide = 'left';
+            }
+        }
+
+        // Arayüz Kilitleme/Açma
+        function toggleUI(disable) {
+            document.getElementById('imageUploader').disabled = disable;
+            document.getElementById('spacingInput').disabled = disable;
+        }
+
+        // Başlık güncelleyiciler
+        document.getElementById('examTitle').addEventListener('input', function(e) {
+            const val = e.target.value || '6.SINIF 2.DENEME';
+            document.querySelectorAll('.displayTitle').forEach(el => el.innerText = val);
+        });
+
+        document.getElementById('creatorName').addEventListener('input', function(e) {
+            const val = e.target.value || 'HLT Matematik';
+            document.querySelectorAll('.displayCreator').forEach(el => el.innerText = val);
+        });
+
+        // Tümünü Temizle (Hafızayı da sıfırlar)
+        function clearAll() {
+            uploadedImages = []; // Hafızayı boşalt
+            currentPage = 1;
+            currentSide = 'left';
+            document.getElementById('examContainer').innerHTML = '';
+            document.getElementById('examContainer').appendChild(createPage(1));
+        }
+    </script>
+
+</body>
+</html>
