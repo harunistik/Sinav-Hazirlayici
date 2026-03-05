@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sınav Kağıdı Hazırlayıcı - Sadeleştirilmiş Sayfalar</title>
+    <title>Sınav Kağıdı Hazırlayıcı - Soru Silme Özellikli</title>
     <style>
         :root {
             --soru-bosluk: 1.5cm;
@@ -31,14 +31,8 @@
         .header-top { background-color: #f38220; padding: 6px; text-align: center; }
         .header-top h1 { margin: 0; font-size: 16px; font-weight: bold; color: black; }
         
-        /* Alt Başlık (Sadece 1. Sayfada Görünecek) */
-        .header-bottom { 
-            padding: 8px 15px; 
-            background-color: white; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-        }
+        /* Alt Başlık */
+        .header-bottom { padding: 8px 15px; background-color: white; display: flex; justify-content: space-between; align-items: center; }
         .header-bottom .student-info { font-size: 14px; font-weight: bold; color: #000; }
         .header-bottom .creator-info p { margin: 0; font-size: 14px; font-weight: bold; color: #000; text-align: right; }
 
@@ -48,8 +42,15 @@
         .column { width: 50%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; }
         .left-column { padding-right: 10mm; box-sizing: border-box; }
         .right-column { padding-left: 10mm; box-sizing: border-box; }
+        
         .question-item { margin-bottom: var(--soru-bosluk); display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
-        .question-number { font-weight: bold; font-size: 14px; min-width: 20px; padding-top: 2px; }
+        
+        /* Sol Taraf (Numara ve Sil Butonu) */
+        .q-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 25px; padding-top: 2px; }
+        .question-number { font-weight: bold; font-size: 14px; }
+        .delete-btn { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px; cursor: pointer; font-size: 12px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .delete-btn:hover { background: #c82333; transform: scale(1.1); }
+
         .question-image { flex: 1; }
         .question-image img { max-width: 100%; max-height: 220mm; object-fit: contain; display: block; }
         
@@ -59,7 +60,7 @@
 
         @media print {
             body { background: white; margin: 0; padding: 0; align-items: flex-start; }
-            .controls { display: none; }
+            .no-print { display: none !important; }
             #examContainer { gap: 0; }
             .paper { box-shadow: none; margin: 0; width: 210mm; height: 297mm; page-break-after: always; }
             .paper:last-child { page-break-after: auto; }
@@ -70,8 +71,8 @@
 <body>
 
     <div class="controls no-print">
-        <input type="text" id="examTitle" placeholder="Deneem Sınavı">
-        <input type="text" id="creatorName" placeholder="HLT Matematik">
+        <input type="text" id="examTitle" placeholder="Üst Başlık (Örn: 6.SINIF 2.DENEME)">
+        <input type="text" id="creatorName" placeholder="Sağ Alt Bilgi (Örn: HLT Matematik)">
         <div class="setting-group">
             Boşluk(cm): <input type="number" id="spacingInput" value="1.5" step="0.5" min="0">
         </div>
@@ -94,14 +95,12 @@
         };
 
         function createPage(pageNum) {
-            const title = document.getElementById('examTitle').value || 'Deneme Sınavı';
+            const title = document.getElementById('examTitle').value || '6.SINIF 2.DENEME';
             const creator = document.getElementById('creatorName').value || 'HLT Matematik';
             const page = document.createElement('div');
             page.className = 'paper';
             page.id = `page-${pageNum}`;
             
-            // Eğer 1. sayfadaysak alt bilgi alanını (Ad Soyad ve Hazırlayan) tamamen oluştur.
-            // Diğer sayfalarda bu alanı (header-bottom) hiç ekleme.
             let headerBottomHtml = '';
             if (pageNum === 1) {
                 headerBottomHtml = `
@@ -163,6 +162,17 @@
             }, 500); 
         });
 
+        // --- SORU SİLME FONKSİYONU ---
+        function deleteQuestion(index) {
+            if(isProcessing) return; // İşlem sürerken basılmasını engeller
+            
+            // Seçilen soruyu hafıza dizisinden çıkar (splice metodu)
+            uploadedImages.splice(index, 1);
+            
+            // Tüm kağıdı yeni sıraya göre tekrar çiz (alttakiler otomatik yukarı kayar)
+            reRenderExam();
+        }
+
         async function reRenderExam() {
             if(isProcessing) return;
             isProcessing = true;
@@ -173,6 +183,7 @@
             currentSide = 'left';
             document.getElementById('examContainer').appendChild(createPage(1));
 
+            // Kalan soruları sırayla yeniden diz
             for (let i = 0; i < uploadedImages.length; i++) {
                 await placeQuestionInDOM(uploadedImages[i], i + 1);
             }
@@ -200,8 +211,14 @@
 
                 const qDiv = document.createElement('div');
                 qDiv.className = 'question-item';
+                
+                // Numaralandırmanın altına Çöp Kutusu (Sil) butonu eklendi.
+                // qNum - 1 mantığı ile tıkladığımız sorunun hafızadaki (Array) tam yerini buluyoruz.
                 qDiv.innerHTML = `
-                    <span class="question-number">${qNum}.</span>
+                    <div class="q-side">
+                        <span class="question-number">${qNum}.</span>
+                        <button class="delete-btn no-print" onclick="deleteQuestion(${qNum - 1})" title="Bu soruyu sil">🗑️</button>
+                    </div>
                     <div class="question-image"><img src="${imgSrc}"></div>
                 `;
 
