@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soru Oluşturucu</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        /* Konteyner genişliği şablona göre JS ile değiştirilecek */
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 1200px; 
+            transition: max-width 0.3s ease;
+        }
+        .container.buyuk-mod {
+            max-width: 1800px; /* 3. Şablon için ekstra genişlik */
+        }
+        h2 { color: #333; text-align: center; margin-top: 0; }
+        .template-selector {
+            background-color: #e8f4fd; padding: 15px; border-radius: 4px;
+            margin-bottom: 25px; border-left: 5px solid #007bff;
+        }
+        .template-selector select {
+            width: 100%; padding: 10px; font-size: 16px;
+            border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; cursor: pointer;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input[type="text"], input[type="file"], textarea {
+            width: 100%; padding: 10px; border: 1px solid #ccc;
+            border-radius: 4px; box-sizing: border-box; font-size: 16px;
+        }
+        textarea { resize: vertical; height: 100px; }
+        .options-container {
+            background-color: #f9f9f9; padding: 15px; border-radius: 4px; border: 1px solid #e0e0e0;
+        }
+        .option-group { display: flex; align-items: center; margin-bottom: 10px; }
+        .option-group label { margin: 0 10px 0 0; width: 20px; }
+        .btn-primary, .btn-success {
+            width: 100%; padding: 15px; color: white; border: none;
+            border-radius: 4px; font-size: 18px; cursor: pointer; font-weight: bold;
+        }
+        .btn-primary { background-color: #007bff; margin-top: 10px; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-success { background-color: #28a745; margin-top: 15px; }
+        .btn-success:hover { background-color: #218838; }
+        .output-container {
+            margin-top: 25px; display: none; flex-direction: column;
+            border-top: 2px dashed #ccc; padding-top: 20px; overflow-x: auto;
+        }
+        .soru-karti {
+            padding: 20px; background-color: #ffffff; border: none;
+            color: #000; font-size: 55px; line-height: 1.4;
+        }
+        .soru-karti p { margin-top: 0; }
+        .resim-alani { text-align: center; margin-bottom: 30px; display: none; }
+        .resim-alani img { max-width: 100%; max-height: 800px; object-fit: contain; }
+        .soru-karti ul {
+            list-style-type: none; padding-left: 0; margin-bottom: 0;
+            display: flex; justify-content: space-between; width: 100%; margin-top: 40px;
+        }
+        .soru-karti li { margin-bottom: 0; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="anaKonteyner">
+    <h2>Soru Oluşturucu Aracı</h2>
+
+    <div class="template-selector">
+        <label for="sablonSecici">Kullanılacak Şablonu Seçiniz:</label>
+        <select id="sablonSecici" onchange="sablonAyarla()">
+            <option value="1">Şablon 1: Klasik Çoktan Seçmeli (Yan Yana Yarım Sayfa)</option>
+            <option value="2">Şablon 2: Resimli Çoktan Seçmeli (Yan Yana Yarım Sayfa)</option>
+            <option value="3">Şablon 3: Resimli Dev Format (Alt Alta Tam Genişlik)</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="aciklama">Açıklama (Metin, Paragraf veya Kural):</label>
+        <textarea id="aciklama" placeholder="Sorunun bağlamını buraya yazın..."></textarea>
+    </div>
+
+    <div class="form-group" id="resimYuklemeKismi" style="display: none;">
+        <label for="soruResmi">Soru Görseli (İsteğe Bağlı):</label>
+        <input type="file" id="soruResmi" accept="image/png, image/jpeg, image/jpg" onchange="resimOnizle(event)">
+    </div>
+
+    <div class="form-group">
+        <label for="soruKoku">Soru Kökü:</label>
+        <input type="text" id="soruKoku" placeholder="Örn: Yukarıdaki metne/görsele göre hangisi doğrudur?">
+    </div>
+
+    <div class="options-container">
+        <label>Şıklar (4 Seçenek):</label>
+        <div class="option-group"><label>A)</label> <input type="text" id="sikA" placeholder="A şıkkı"></div>
+        <div class="option-group"><label>B)</label> <input type="text" id="sikB" placeholder="B şıkkı"></div>
+        <div class="option-group"><label>C)</label> <input type="text" id="sikC" placeholder="C şıkkı"></div>
+        <div class="option-group"><label>D)</label> <input type="text" id="sikD" placeholder="D şıkkı"></div>
+    </div>
+
+    <button class="btn-primary" onclick="soruyuOlustur()">Soruyu Oluştur</button>
+
+    <div class="output-container" id="ciktiAlani">
+        <div class="soru-karti" id="soruKarti">
+            <p id="onizlemeAciklama" style="font-style: italic; margin-bottom: 30px;"></p>
+            <div class="resim-alani" id="onizlemeResimAlani">
+                <img id="onizlemeResim" src="" alt="Soru Görseli">
+            </div>
+            <p id="onizlemeSoru" style="font-weight: bold; margin-bottom: 30px;"></p>
+            <ul id="onizlemeSiklar"></ul>
+        </div>
+        <button class="btn-success" onclick="resimOlarakIndir()">PNG Olarak İndir</button>
+    </div>
+</div>
+
+<script>
+    let yuklenenResimVerisi = "";
+
+    function sablonAyarla() {
+        const secilen = document.getElementById('sablonSecici').value;
+        const konteyner = document.getElementById('anaKonteyner');
+        
+        // 2 ve 3. şablonlarda resim yükleme alanını göster
+        document.getElementById('resimYuklemeKismi').style.display = (secilen === "2" || secilen === "3") ? 'block' : 'none';
+        
+        // 3. şablon seçildiğinde ana div'in genişliğini tam sayfa yap
+        if (secilen === "3") {
+            konteyner.classList.add('buyuk-mod');
+        } else {
+            konteyner.classList.remove('buyuk-mod');
+        }
+
+        document.getElementById('ciktiAlani').style.display = 'none';
+    }
+
+    function resimOnizle(event) {
+        const dosya = event.target.files[0];
+        if (dosya) {
+            const okuyucu = new FileReader();
+            okuyucu.onload = e => yuklenenResimVerisi = e.target.result;
+            okuyucu.readAsDataURL(dosya);
+        }
+    }
+
+    function soruyuOlustur() {
+        const sablon = document.getElementById('sablonSecici').value;
+        
+        document.getElementById('ciktiAlani').style.display = 'flex';
+        document.getElementById('onizlemeAciklama').innerText = document.getElementById('aciklama').value;
+        document.getElementById('onizlemeSoru').innerText = document.getElementById('soruKoku').value;
+        
+        const resimKutusu = document.getElementById('onizlemeResimAlani');
+        if ((sablon === "2" || sablon === "3") && yuklenenResimVerisi) {
+            document.getElementById('onizlemeResim').src = yuklenenResimVerisi;
+            resimKutusu.style.display = 'block';
+        } else {
+            resimKutusu.style.display = 'none';
+        }
+        
+        // Şıklar 4 seçeneğe (A, B, C, D) düşürüldü
+        document.getElementById('onizlemeSiklar').innerHTML = `
+            <li><strong>A)</strong> ${document.getElementById('sikA').value}</li>
+            <li><strong>B)</strong> ${document.getElementById('sikB').value}</li>
+            <li><strong>C)</strong> ${document.getElementById('sikC').value}</li>
+            <li><strong>D)</strong> ${document.getElementById('sikD').value}</li>
+        `;
+    }
+
+    function resimOlarakIndir() {
+        const sablon = document.getElementById('sablonSecici').value;
+        // 3. Şablon için kalite (scale) oranını 4'e çıkararak devasa çözünürlük sağlıyoruz. Diğerleri için 3 yeterli.
+        const kaliteOrani = (sablon === "3") ? 4 : 3;
+
+        html2canvas(document.getElementById('soruKarti'), { 
+            backgroundColor: "#ffffff", 
+            scale: kaliteOrani 
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL("image/png");
+            link.download = `soru-sablon${sablon}.png`;
+            link.click();
+        });
+    }
+</script>
+</body>
+</html>

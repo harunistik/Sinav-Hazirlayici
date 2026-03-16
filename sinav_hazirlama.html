@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sınav Kağıdı Hazırlayıcı - Soru Silme Özellikli</title>
+    <title>Sınav Kağıdı Hazırlayıcı - Kusursuz Tam Sayfa</title>
     <style>
         :root {
             --soru-bosluk: 1.5cm;
@@ -12,11 +12,17 @@
         /* --- Arayüz Ayarları --- */
         body { font-family: Arial, sans-serif; background-color: #444; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .controls { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 30px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; justify-content: center; width: 100%; max-width: 900px; position: sticky; top: 10px; z-index: 1000; }
-        .controls input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 180px; }
+        .controls input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 160px; }
         .controls input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 60px; }
-        .controls .setting-group { display: flex; align-items: center; gap: 5px; font-weight: bold; font-size: 14px; color: #333; }
-        .controls button { padding: 10px 15px; background-color: #f38220; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;}
-        .controls button:hover { background-color: #d66f15; }
+        .controls .setting-group { display: flex; align-items: center; gap: 5px; font-weight: bold; font-size: 13px; color: #333; }
+        
+        /* Dosya Yükleme Alanları */
+        .upload-group { display: flex; flex-direction: column; gap: 5px; background: #f8f9fa; border: 1px dashed #adb5bd; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; }
+        .upload-group input { font-size: 12px; cursor: pointer; }
+        .upload-group.full-page { border-color: #f38220; background: #fff4ec; } 
+
+        .controls button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        .controls button:hover { background-color: #0056b3; }
         .controls .clear-btn { background-color: #dc3545; }
         .controls .clear-btn:hover { background-color: #c82333; }
         #loadingIndicator { display: none; color: #f38220; font-weight: bold; margin-left: 10px; }
@@ -36,16 +42,32 @@
         .header-bottom .student-info { font-size: 14px; font-weight: bold; color: #000; }
         .header-bottom .creator-info p { margin: 0; font-size: 14px; font-weight: bold; color: #000; text-align: right; }
 
-        /* Sütunlar ve Sorular */
+        /* --- SÜTUN MİMARİSİ --- */
         .content-wrapper { flex: 1; display: flex; position: relative; height: 100%; max-height: 100%; }
-        .content-wrapper::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: #f38220; transform: translateX(-50%); z-index: 1; }
-        .column { width: 50%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; }
-        .left-column { padding-right: 10mm; box-sizing: border-box; }
-        .right-column { padding-left: 10mm; box-sizing: border-box; }
         
-        .question-item { margin-bottom: var(--soru-bosluk); display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
+        .wrapper-normal::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: #f38220; transform: translateX(-50%); z-index: 1; }
+        .wrapper-full::after { display: none; }
+
+        .column { height: 100%; display: flex; flex-direction: column; justify-content: flex-start; }
+        .left-column { width: 50%; padding-right: 10mm; box-sizing: border-box; }
+        .right-column { width: 50%; padding-left: 10mm; box-sizing: border-box; }
+        .full-column { width: 100%; padding: 0 5mm; box-sizing: border-box; } 
+
+        /* --- SORU DÜZENLERİ --- */
+        .question-item { 
+            margin-bottom: var(--soru-bosluk); 
+            display: flex; 
+            align-items: flex-start; 
+            gap: 8px; 
+            flex-shrink: 0; 
+        }
+
+        /* YENİ: Tam Sayfa Sorular İçin Ekstra Boşluk Sınırı */
+        /* Normal boşluğa 2.5cm daha ekler, böylece genel boşluk ayarını bozmadan ferahlık sağlar */
+        .layout-full .question-item {
+            margin-bottom: calc(var(--soru-bosluk) + 2.5cm);
+        }
         
-        /* Sol Taraf (Numara ve Sil Butonu) */
         .q-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 25px; padding-top: 2px; }
         .question-number { font-weight: bold; font-size: 14px; }
         .delete-btn { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px; cursor: pointer; font-size: 12px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
@@ -53,7 +75,8 @@
 
         .question-image { flex: 1; }
         .question-image img { max-width: 100%; max-height: 220mm; object-fit: contain; display: block; }
-        
+        .layout-full .question-image img { max-height: 120mm; }
+
         /* Alt Bilgi */
         .footer { border-top: 1.5px solid #f38220; position: relative; margin-top: auto; padding-top: 10px; text-align: center; flex-shrink: 0; z-index: 2; }
         .page-number { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); background: white; border: 1.5px solid #f38220; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #f38220; font-size: 14px; z-index: 3; }
@@ -73,13 +96,24 @@
     <div class="controls no-print">
         <input type="text" id="examTitle" placeholder="Üst Başlık (Örn: 6.SINIF 2.DENEME)">
         <input type="text" id="creatorName" placeholder="Sağ Alt Bilgi (Örn: HLT Matematik)">
+        
         <div class="setting-group">
             Boşluk(cm): <input type="number" id="spacingInput" value="1.5" step="0.5" min="0">
         </div>
-        <input type="file" id="imageUploader" multiple accept="image/png, image/jpeg, image/jpg">
-        <button onclick="window.print()">PDF Olarak Çıktı Al</button>
+
+        <div class="upload-group">
+            <label>Normal Soru Ekle (2 Sütun):</label>
+            <input type="file" id="imageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+        </div>
+
+        <div class="upload-group full-page">
+            <label style="color: #d66f15;">Tam Sayfa Soru Ekle (1 Sütun - Max 2):</label>
+            <input type="file" id="fullImageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+        </div>
+
+        <button onclick="window.print()" style="background-color: #f38220;">PDF Çıktı Al</button>
         <button class="clear-btn" onclick="clearAll()">Tümünü Temizle</button>
-        <span id="loadingIndicator">Yeniden Hesaplanıyor...</span>
+        <span id="loadingIndicator">İşleniyor...</span>
     </div>
 
     <div id="examContainer"></div>
@@ -87,18 +121,19 @@
     <script>
         let uploadedImages = []; 
         let currentPage = 1;
-        let currentSide = 'left';
+        let currentPageType = 'normal'; 
+        let currentSide = 'left'; 
         let isProcessing = false;
 
         window.onload = () => {
-            document.getElementById('examContainer').appendChild(createPage(1));
+            document.getElementById('examContainer').appendChild(createPage(1, 'normal'));
         };
 
-        function createPage(pageNum) {
+        function createPage(pageNum, layoutType = 'normal') {
             const title = document.getElementById('examTitle').value || '6.SINIF 2.DENEME';
             const creator = document.getElementById('creatorName').value || 'HLT Matematik';
             const page = document.createElement('div');
-            page.className = 'paper';
+            page.className = `paper layout-${layoutType}`;
             page.id = `page-${pageNum}`;
             
             let headerBottomHtml = '';
@@ -111,21 +146,35 @@
                 `;
             }
             
+            let columnsHtml = '';
+            if (layoutType === 'normal') {
+                columnsHtml = `
+                    <div class="column left-column" id="page-${pageNum}-left"></div>
+                    <div class="column right-column" id="page-${pageNum}-right"></div>
+                `;
+            } else {
+                columnsHtml = `
+                    <div class="column full-column" id="page-${pageNum}-full"></div>
+                `;
+            }
+            
             page.innerHTML = `
                 <div class="header-box">
                     <div class="header-top"><h1 class="displayTitle">${title}</h1></div>
                     ${headerBottomHtml}
                 </div>
-                <div class="content-wrapper">
-                    <div class="column left-column" id="page-${pageNum}-left"></div>
-                    <div class="column right-column" id="page-${pageNum}-right"></div>
+                <div class="content-wrapper wrapper-${layoutType}">
+                    ${columnsHtml}
                 </div>
                 <div class="footer"><div class="page-number">${pageNum}</div></div>
             `;
             return page;
         }
 
-        document.getElementById('imageUploader').addEventListener('change', async function(e) {
+        document.getElementById('imageUploader').addEventListener('change', (e) => handleUpload(e, 'normal'));
+        document.getElementById('fullImageUploader').addEventListener('change', (e) => handleUpload(e, 'full'));
+
+        async function handleUpload(e, layoutType) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             toggleUI(true); 
@@ -133,14 +182,13 @@
             for (let file of files) {
                 if (file.type.startsWith('image/')) {
                     const imgSrc = await readFileAsDataURL(file);
-                    uploadedImages.push(imgSrc); 
-                    await placeQuestionInDOM(imgSrc, uploadedImages.length); 
+                    uploadedImages.push({ src: imgSrc, layout: layoutType }); 
                 }
             }
-            
-            this.value = ''; 
+            e.target.value = ''; 
+            await reRenderExam(); 
             toggleUI(false);
-        });
+        }
 
         function readFileAsDataURL(file) {
             return new Promise(resolve => {
@@ -150,28 +198,20 @@
             });
         }
 
+        function deleteQuestion(index) {
+            if(isProcessing) return; 
+            uploadedImages.splice(index, 1);
+            reRenderExam();
+        }
+
         let spacingTimeout;
         document.getElementById('spacingInput').addEventListener('input', function(e) {
             const gap = e.target.value || 0;
             document.documentElement.style.setProperty('--soru-bosluk', gap + 'cm');
             if(uploadedImages.length === 0) return;
-
             clearTimeout(spacingTimeout);
-            spacingTimeout = setTimeout(() => {
-                reRenderExam();
-            }, 500); 
+            spacingTimeout = setTimeout(() => { reRenderExam(); }, 500); 
         });
-
-        // --- SORU SİLME FONKSİYONU ---
-        function deleteQuestion(index) {
-            if(isProcessing) return; // İşlem sürerken basılmasını engeller
-            
-            // Seçilen soruyu hafıza dizisinden çıkar (splice metodu)
-            uploadedImages.splice(index, 1);
-            
-            // Tüm kağıdı yeni sıraya göre tekrar çiz (alttakiler otomatik yukarı kayar)
-            reRenderExam();
-        }
 
         async function reRenderExam() {
             if(isProcessing) return;
@@ -180,19 +220,26 @@
 
             document.getElementById('examContainer').innerHTML = '';
             currentPage = 1;
-            currentSide = 'left';
-            document.getElementById('examContainer').appendChild(createPage(1));
+            
+            currentPageType = uploadedImages.length > 0 ? uploadedImages[0].layout : 'normal';
+            currentSide = currentPageType === 'normal' ? 'left' : 'full';
+            
+            document.getElementById('examContainer').appendChild(createPage(1, currentPageType));
 
-            // Kalan soruları sırayla yeniden diz
             for (let i = 0; i < uploadedImages.length; i++) {
-                await placeQuestionInDOM(uploadedImages[i], i + 1);
+                await placeQuestionInDOM(i);
             }
 
             document.getElementById('loadingIndicator').style.display = 'none';
             isProcessing = false;
         }
 
-        async function placeQuestionInDOM(imgSrc, qNum) {
+        async function placeQuestionInDOM(index) {
+            const qData = uploadedImages[index];
+            const imgSrc = qData.src;
+            const targetLayout = qData.layout; 
+            const qNum = index + 1;
+
             await new Promise(resolve => {
                 const tempImg = new Image();
                 tempImg.onload = resolve;
@@ -202,22 +249,38 @@
             let placed = false;
 
             while (!placed) {
+                if (currentPageType !== targetLayout) {
+                    const wrapper = document.querySelector(`#page-${currentPage} .content-wrapper`);
+                    const hasItems = wrapper && wrapper.querySelectorAll('.question-item').length > 0;
+                    
+                    if (hasItems) {
+                        currentPage++;
+                    } else {
+                        const oldPage = document.getElementById(`page-${currentPage}`);
+                        if(oldPage) oldPage.remove();
+                    }
+                    
+                    currentPageType = targetLayout;
+                    currentSide = targetLayout === 'normal' ? 'left' : 'full';
+                    
+                    if (!document.getElementById(`page-${currentPage}`)) {
+                        document.getElementById('examContainer').appendChild(createPage(currentPage, currentPageType));
+                    }
+                }
+
                 let targetColumn = document.getElementById(`page-${currentPage}-${currentSide}`);
                 
                 if (!targetColumn) {
-                    document.getElementById('examContainer').appendChild(createPage(currentPage));
+                    document.getElementById('examContainer').appendChild(createPage(currentPage, currentPageType));
                     targetColumn = document.getElementById(`page-${currentPage}-${currentSide}`);
                 }
 
                 const qDiv = document.createElement('div');
-                qDiv.className = 'question-item';
-                
-                // Numaralandırmanın altına Çöp Kutusu (Sil) butonu eklendi.
-                // qNum - 1 mantığı ile tıkladığımız sorunun hafızadaki (Array) tam yerini buluyoruz.
+                qDiv.className = `question-item`;
                 qDiv.innerHTML = `
                     <div class="q-side">
                         <span class="question-number">${qNum}.</span>
-                        <button class="delete-btn no-print" onclick="deleteQuestion(${qNum - 1})" title="Bu soruyu sil">🗑️</button>
+                        <button class="delete-btn no-print" onclick="deleteQuestion(${index})" title="Bu soruyu sil">🗑️</button>
                     </div>
                     <div class="question-image"><img src="${imgSrc}"></div>
                 `;
@@ -225,6 +288,12 @@
                 targetColumn.appendChild(qDiv);
 
                 await new Promise(r => setTimeout(r, 20));
+
+                if (currentPageType === 'full' && targetColumn.children.length > 2) {
+                    targetColumn.removeChild(qDiv);
+                    advancePagePointer(currentPageType);
+                    continue; 
+                }
 
                 const colRect = targetColumn.getBoundingClientRect();
                 const qRect = qDiv.getBoundingClientRect();
@@ -234,10 +303,10 @@
                 if ((qRect.bottom + marginBottom) > colRect.bottom + 5) {
                     if (targetColumn.children.length === 1) {
                         placed = true;
-                        advancePagePointer();
+                        advancePagePointer(currentPageType);
                     } else {
                         targetColumn.removeChild(qDiv); 
-                        advancePagePointer(); 
+                        advancePagePointer(currentPageType); 
                     }
                 } else {
                     placed = true; 
@@ -245,17 +314,25 @@
             }
         }
 
-        function advancePagePointer() {
-            if (currentSide === 'left') {
-                currentSide = 'right'; 
-            } else {
-                currentPage++; 
-                currentSide = 'left';
+        function advancePagePointer(layout) {
+            if (layout === 'normal') {
+                if (currentSide === 'left') {
+                    currentSide = 'right'; 
+                } else {
+                    currentPage++; 
+                    currentSide = 'left';
+                    document.getElementById('examContainer').appendChild(createPage(currentPage, layout));
+                }
+            } else if (layout === 'full') {
+                currentPage++;
+                currentSide = 'full';
+                document.getElementById('examContainer').appendChild(createPage(currentPage, layout));
             }
         }
 
         function toggleUI(disable) {
             document.getElementById('imageUploader').disabled = disable;
+            document.getElementById('fullImageUploader').disabled = disable;
             document.getElementById('spacingInput').disabled = disable;
         }
 
@@ -272,9 +349,10 @@
         function clearAll() {
             uploadedImages = []; 
             currentPage = 1;
+            currentPageType = 'normal';
             currentSide = 'left';
             document.getElementById('examContainer').innerHTML = '';
-            document.getElementById('examContainer').appendChild(createPage(1));
+            document.getElementById('examContainer').appendChild(createPage(1, 'normal'));
         }
     </script>
 
