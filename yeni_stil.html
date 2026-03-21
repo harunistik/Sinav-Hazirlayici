@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sınav Kağıdı Hazırlayıcı - Dinamik Başlıklar</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --soru-bosluk: 1.5cm;
+            --main-blue: #1b1464; /* Tasarımdaki canlı lacivert/mavi */
+            --main-red: #ff2a2a;      /* Tasarımdaki kırmızı */
+            --main-yellow: #ffde59;   /* Tasarımdaki sarı */
+        }
+
+        /* --- Arayüz Ayarları (Çıktıda Gizlenir) --- */
+        body { font-family: Arial, sans-serif; background-color: #444; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .controls { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 30px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center; width: 100%; max-width: 1000px; position: sticky; top: 10px; z-index: 1000; }
+        .controls input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px; }
+        .controls input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 60px; }
+        .controls .setting-group { display: flex; align-items: center; gap: 5px; font-weight: bold; font-size: 13px; color: #333; }
+        
+        .upload-group { display: flex; flex-direction: column; gap: 5px; background: #f8f9fa; border: 1px dashed #adb5bd; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; }
+        .upload-group input { font-size: 12px; cursor: pointer; max-width: 180px;}
+        .upload-group.full-page { border-color: var(--main-blue); background: #eef2ff; }
+
+        .controls button { padding: 10px 15px; background-color: var(--main-blue); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        .controls button:hover { background-color: #110c44; }
+        .controls .clear-btn { background-color: #dc3545; }
+        .controls .clear-btn:hover { background-color: #c82333; }
+        #loadingIndicator { display: none; color: var(--main-blue); font-weight: bold; margin-left: 10px; }
+
+        /* --- Sınav Kağıdı Konteyneri --- */
+        #examContainer { display: flex; flex-direction: column; gap: 40px; width: 210mm; }
+
+        /* KENAR BOŞLUKLARI */
+        .paper { background: white; width: 210mm; height: 297mm; max-height: 297mm; padding: 5mm 10mm 5mm 10mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); box-sizing: border-box; display: flex; flex-direction: column; position: relative; margin: 0 auto; overflow: hidden; }
+        
+        /* --- 1. SAYFA BÜYÜK BAŞLIK --- */
+        .header-box { 
+            background: linear-gradient(90deg, #000000 0%, #0d0a3d 40%, #1b1464 100%);
+            border-radius: 15px;
+            margin-bottom: 5mm; 
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header-title { display: flex; align-items: center; gap: 10px; font-family: 'Impact', 'Arial Black', sans-serif; font-size: 30px; letter-spacing: 1px; }
+        .header-title .highlight { color: var(--main-red); }
+        .header-title .subject { color: var(--main-yellow); }
+
+        .header-qr-container { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .qr-wrapper { background: white; padding: 4px; border-radius: 8px; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; }
+        .qr-text { color: var(--main-yellow); font-weight: bold; font-size: 11px; font-family: Arial, sans-serif;}
+
+        /* --- DİĞER SAYFALAR SADE BAŞLIK --- */
+        .secondary-header-box {
+            border: 1.5px solid var(--main-blue);
+            border-radius: 8px;
+            margin-bottom: 5mm;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 15px;
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+        }
+        
+        .secondary-header-left { display: flex; gap: 6px; }
+        .secondary-header-left .highlight { color: var(--main-red); }
+        .secondary-header-left .subject { color: var(--main-blue); }
+        
+        .secondary-header-right { 
+            color: var(--main-blue); 
+            font-family: Arial, sans-serif; 
+            font-size: 14px; 
+            font-weight: bold; 
+            letter-spacing: 0;
+        }
+
+        /* --- SÜTUN MİMARİSİ --- */
+        .content-wrapper { flex: 1; display: flex; position: relative; height: 100%; max-height: 100%; }
+        
+        .wrapper-normal::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: var(--main-blue); transform: translateX(-50%); z-index: 1; }
+        .wrapper-full::after { display: none; }
+
+        .column { height: 100%; display: flex; flex-direction: column; justify-content: flex-start; }
+        .left-column { width: 50%; padding-right: 10mm; box-sizing: border-box; }
+        .right-column { width: 50%; padding-left: 10mm; box-sizing: border-box; }
+        .full-column { width: 100%; padding: 0 5mm; box-sizing: border-box; } 
+
+        /* --- SORU DÜZENLERİ --- */
+        .question-item { margin-bottom: var(--soru-bosluk); display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
+        .layout-full .question-item { margin-bottom: calc(var(--soru-bosluk) + 2.5cm); }
+        
+        .q-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 25px; padding-top: 2px; }
+        .question-number { font-weight: bold; font-size: 14px; }
+        .delete-btn { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px; cursor: pointer; font-size: 12px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .delete-btn:hover { background: #c82333; transform: scale(1.1); }
+
+        .question-image { flex: 1; }
+        .question-image img { max-width: 100%; max-height: 220mm; object-fit: contain; display: block; }
+        .layout-full .question-image img { max-height: 120mm; }
+
+        /* --- ALT BİLGİ (FOOTER) --- */
+        .footer-line { 
+            width: 100%;
+            height: 1.5px;
+            background-color: var(--main-blue); 
+            position: relative; 
+            margin-top: auto; 
+            margin-bottom: 2mm;
+            flex-shrink: 0; 
+            z-index: 2; 
+        }
+        
+        .diamond-shape {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(45deg);
+            width: 22px;
+            height: 22px;
+            background: white;
+            border: 1.5px solid var(--main-blue); 
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .diamond-text {
+            transform: rotate(-45deg);
+            color: var(--main-blue);
+            font-weight: bold;
+            font-size: 13px;
+            font-family: Arial, sans-serif;
+        }
+
+        .footer-brand {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            padding-left: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            color: var(--main-blue);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 3;
+        }
+        .yt-icon { width: 22px; height: 22px; fill: var(--main-red); }
+
+        @media print {
+            body { background: white; margin: 0; padding: 0; align-items: flex-start; }
+            .no-print { display: none !important; }
+            #examContainer { gap: 0; }
+            .paper { box-shadow: none; margin: 0; width: 210mm; height: 297mm; page-break-after: always; }
+            .paper:last-child { page-break-after: auto; }
+            @page { size: A4; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls no-print">
+        <input type="text" id="highlightTitle" value="50" placeholder="Kırmızı Vurgu (Örn: 50)">
+        <input type="text" id="mainTitle" value="SORUDA EŞİTSİZLİKLER" placeholder="Sarı Başlık">
+        
+        <input type="text" id="subHeaderInfo" value="6. SINIF 2. DENEME" placeholder="Diğer Sayfalar Sağ Üst">
+        
+        <input type="text" id="videoLink" placeholder="Video Linki" value="https://youtube.com">
+        
+        <div class="setting-group">
+            Boşluk(cm): <input type="number" id="spacingInput" value="1.5" step="0.5" min="0">
+        </div>
+
+        <div class="upload-group">
+            <label>Normal (2 Sütun):</label>
+            <input type="file" id="imageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+        </div>
+
+        <div class="upload-group full-page">
+            <label style="color: var(--main-blue);">Tam Sayfa (1 Sütun - Max 2):</label>
+            <input type="file" id="fullImageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+        </div>
+
+        <button onclick="window.print()">PDF Çıktı Al</button>
+        <button class="clear-btn" onclick="clearAll()">Tümünü Temizle</button>
+        <span id="loadingIndicator">İşleniyor...</span>
+    </div>
+
+    <div id="examContainer"></div>
+
+    <script>
+        let uploadedImages = []; 
+        let currentPage = 1;
+        let currentPageType = 'normal'; 
+        let currentSide = 'left'; 
+        let isProcessing = false;
+
+        window.onload = () => {
+            document.getElementById('examContainer').appendChild(createPage(1, 'normal'));
+            renderAllQRCodes(); 
+        };
+
+        // --- SAYFA OLUŞTURUCU ---
+        function createPage(pageNum, layoutType = 'normal') {
+            const highlight = document.getElementById('highlightTitle').value || '50';
+            const subject = document.getElementById('mainTitle').value || 'SORUDA EŞİTSİZLİKLER';
+            const subInfo = document.getElementById('subHeaderInfo').value || '6. SINIF 2. DENEME'; // Yeni Alan
+            
+            const page = document.createElement('div');
+            page.className = `paper layout-${layoutType}`;
+            page.id = `page-${pageNum}`;
+            
+            let columnsHtml = layoutType === 'normal' 
+                ? `<div class="column left-column" id="page-${pageNum}-left"></div><div class="column right-column" id="page-${pageNum}-right"></div>`
+                : `<div class="column full-column" id="page-${pageNum}-full"></div>`;
+            
+            let headerHtml = '';
+            
+            // Eğer 1. sayfa ise büyük ana başlığı oluştur
+            if (pageNum === 1) {
+                headerHtml = `
+                    <div class="header-box">
+                        <div class="header-title">
+                            <span class="highlight displayHighlight">${highlight}</span>
+                            <span class="subject displaySubject">${subject}</span>
+                        </div>
+                        <div class="header-qr-container">
+                            <div class="qr-wrapper qr-code-box"></div>
+                            <span class="qr-text">Video Çözümler</span>
+                        </div>
+                    </div>
+                `;
+            } 
+            // Eğer 2, 3 vb. sayfalar ise sade çerçeveli başlığı oluştur
+            else {
+                headerHtml = `
+                    <div class="secondary-header-box">
+                        <div class="secondary-header-left">
+                            <span class="highlight displayHighlight">${highlight}</span>
+                            <span class="subject displaySubject">${subject}</span>
+                        </div>
+                        <div class="secondary-header-right displaySubInfo">${subInfo}</div>
+                    </div>
+                `;
+            }
+
+            page.innerHTML = `
+                ${headerHtml}
+                <div class="content-wrapper wrapper-${layoutType}">
+                    ${columnsHtml}
+                </div>
+                <div class="footer-line">
+                    <div class="diamond-shape"><span class="diamond-text">${pageNum}</span></div>
+                    <div class="footer-brand">
+                        <svg viewBox="0 0 24 24" class="yt-icon">
+                            <path d="M21.582,6.186c-0.23-0.86-0.908-1.538-1.768-1.768C18.254,4,12,4,12,4S5.746,4,4.186,4.418 c-0.86,0.23-1.538,0.908-1.768,1.768C2,7.746,2,12,2,12s0,4.254,0.418,5.814c0.23,0.86,0.908,1.538,1.768,1.768 C5.746,20,12,20,12,20s6.254,0,7.814-0.418c0.86-0.23,1.538-0.908,1.768-1.768C22,16.254,22,12,22,12S22,7.746,21.582,6.186z M9.803,15.569V8.431L16.035,12L9.803,15.569z"/>
+                        </svg>
+                        HLT Matematik
+                    </div>
+                </div>
+            `;
+            return page;
+        }
+
+        // QR Kodları sadece 1. sayfadaki kutuda render edilir
+        function renderAllQRCodes() {
+            const link = document.getElementById('videoLink').value || 'https://youtube.com';
+            const qrBoxes = document.querySelectorAll('.qr-code-box');
+            
+            qrBoxes.forEach(box => {
+                box.innerHTML = ''; 
+                new QRCode(box, {
+                    text: link,
+                    width: 48, 
+                    height: 48,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.L
+                });
+            });
+        }
+
+        document.getElementById('videoLink').addEventListener('input', renderAllQRCodes);
+
+        // Canlı metin güncellemeleri
+        document.getElementById('highlightTitle').addEventListener('input', function(e) {
+            document.querySelectorAll('.displayHighlight').forEach(el => el.innerText = e.target.value || '50');
+        });
+        document.getElementById('mainTitle').addEventListener('input', function(e) {
+            document.querySelectorAll('.displaySubject').forEach(el => el.innerText = e.target.value || 'SORUDA EŞİTSİZLİKLER');
+        });
+        document.getElementById('subHeaderInfo').addEventListener('input', function(e) {
+            document.querySelectorAll('.displaySubInfo').forEach(el => el.innerText = e.target.value || '6. SINIF 2. DENEME');
+        });
+
+        // Yükleme motoru
+        document.getElementById('imageUploader').addEventListener('change', (e) => handleUpload(e, 'normal'));
+        document.getElementById('fullImageUploader').addEventListener('change', (e) => handleUpload(e, 'full'));
+
+        async function handleUpload(e, layoutType) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            toggleUI(true); 
+
+            for (let file of files) {
+                if (file.type.startsWith('image/')) {
+                    const imgSrc = await readFileAsDataURL(file);
+                    uploadedImages.push({ src: imgSrc, layout: layoutType }); 
+                }
+            }
+            e.target.value = ''; 
+            await reRenderExam(); 
+            toggleUI(false);
+        }
+
+        function readFileAsDataURL(file) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function deleteQuestion(index) {
+            if(isProcessing) return; 
+            uploadedImages.splice(index, 1);
+            reRenderExam();
+        }
+
+        let spacingTimeout;
+        document.getElementById('spacingInput').addEventListener('input', function(e) {
+            const gap = e.target.value || 0;
+            document.documentElement.style.setProperty('--soru-bosluk', gap + 'cm');
+            if(uploadedImages.length === 0) return;
+            clearTimeout(spacingTimeout);
+            spacingTimeout = setTimeout(() => { reRenderExam(); }, 500); 
+        });
+
+        async function reRenderExam() {
+            if(isProcessing) return;
+            isProcessing = true;
+            document.getElementById('loadingIndicator').style.display = 'inline';
+
+            document.getElementById('examContainer').innerHTML = '';
+            currentPage = 1;
+            
+            currentPageType = uploadedImages.length > 0 ? uploadedImages[0].layout : 'normal';
+            currentSide = currentPageType === 'normal' ? 'left' : 'full';
+            
+            document.getElementById('examContainer').appendChild(createPage(1, currentPageType));
+
+            for (let i = 0; i < uploadedImages.length; i++) {
+                await placeQuestionInDOM(i);
+            }
+
+            renderAllQRCodes();
+            document.getElementById('loadingIndicator').style.display = 'none';
+            isProcessing = false;
+        }
+
+        async function placeQuestionInDOM(index) {
+            const qData = uploadedImages[index];
+            const imgSrc = qData.src;
+            const targetLayout = qData.layout; 
+            const qNum = index + 1;
+
+            await new Promise(resolve => {
+                const tempImg = new Image();
+                tempImg.onload = resolve;
+                tempImg.src = imgSrc;
+            });
+
+            let placed = false;
+
+            while (!placed) {
+                if (currentPageType !== targetLayout) {
+                    const wrapper = document.querySelector(`#page-${currentPage} .content-wrapper`);
+                    const hasItems = wrapper && wrapper.querySelectorAll('.question-item').length > 0;
+                    
+                    if (hasItems) {
+                        currentPage++;
+                    } else {
+                        const oldPage = document.getElementById(`page-${currentPage}`);
+                        if(oldPage) oldPage.remove();
+                    }
+                    
+                    currentPageType = targetLayout;
+                    currentSide = targetLayout === 'normal' ? 'left' : 'full';
+                    
+                    if (!document.getElementById(`page-${currentPage}`)) {
+                        document.getElementById('examContainer').appendChild(createPage(currentPage, currentPageType));
+                    }
+                }
+
+                let targetColumn = document.getElementById(`page-${currentPage}-${currentSide}`);
+                
+                if (!targetColumn) {
+                    document.getElementById('examContainer').appendChild(createPage(currentPage, currentPageType));
+                    targetColumn = document.getElementById(`page-${currentPage}-${currentSide}`);
+                }
+
+                const qDiv = document.createElement('div');
+                qDiv.className = `question-item`;
+                qDiv.innerHTML = `
+                    <div class="q-side">
+                        <span class="question-number">${qNum}.</span>
+                        <button class="delete-btn no-print" onclick="deleteQuestion(${index})" title="Bu soruyu sil">🗑️</button>
+                    </div>
+                    <div class="question-image"><img src="${imgSrc}"></div>
+                `;
+
+                targetColumn.appendChild(qDiv);
+
+                await new Promise(r => setTimeout(r, 20));
+
+                if (currentPageType === 'full' && targetColumn.children.length > 2) {
+                    targetColumn.removeChild(qDiv);
+                    advancePagePointer(currentPageType);
+                    continue; 
+                }
+
+                const colRect = targetColumn.getBoundingClientRect();
+                const qRect = qDiv.getBoundingClientRect();
+                const style = window.getComputedStyle(qDiv);
+                const marginBottom = parseFloat(style.marginBottom) || 0;
+
+                if ((qRect.bottom + marginBottom) > colRect.bottom + 5) {
+                    if (targetColumn.children.length === 1) {
+                        placed = true;
+                        advancePagePointer(currentPageType);
+                    } else {
+                        targetColumn.removeChild(qDiv); 
+                        advancePagePointer(currentPageType); 
+                    }
+                } else {
+                    placed = true; 
+                }
+            }
+        }
+
+        function advancePagePointer(layout) {
+            if (layout === 'normal') {
+                if (currentSide === 'left') {
+                    currentSide = 'right'; 
+                } else {
+                    currentPage++; 
+                    currentSide = 'left';
+                    document.getElementById('examContainer').appendChild(createPage(currentPage, layout));
+                }
+            } else if (layout === 'full') {
+                currentPage++;
+                currentSide = 'full';
+                document.getElementById('examContainer').appendChild(createPage(currentPage, layout));
+            }
+        }
+
+        function toggleUI(disable) {
+            document.getElementById('imageUploader').disabled = disable;
+            document.getElementById('fullImageUploader').disabled = disable;
+            document.getElementById('spacingInput').disabled = disable;
+            document.getElementById('videoLink').disabled = disable;
+            document.getElementById('subHeaderInfo').disabled = disable;
+        }
+
+        function clearAll() {
+            uploadedImages = []; 
+            currentPage = 1;
+            currentPageType = 'normal';
+            currentSide = 'left';
+            document.getElementById('examContainer').innerHTML = '';
+            document.getElementById('examContainer').appendChild(createPage(1, 'normal'));
+            renderAllQRCodes();
+        }
+    </script>
+
+</body>
+</html>
