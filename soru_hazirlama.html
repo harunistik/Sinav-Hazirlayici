@@ -4,7 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Soru Oluşturucu</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -14,7 +27,6 @@
             display: flex;
             justify-content: center;
         }
-        /* Konteyner genişliği şablona göre JS ile değiştirilecek */
         .container {
             background-color: #fff;
             padding: 30px;
@@ -24,18 +36,48 @@
             max-width: 1200px; 
             transition: max-width 0.3s ease;
         }
-        .container.buyuk-mod {
-            max-width: 1800px; /* 3. Şablon için ekstra genişlik */
-        }
+        .container.buyuk-mod { max-width: 1800px; }
         h2 { color: #333; text-align: center; margin-top: 0; }
+        
         .template-selector {
             background-color: #e8f4fd; padding: 15px; border-radius: 4px;
-            margin-bottom: 25px; border-left: 5px solid #007bff;
+            margin-bottom: 20px; border-left: 5px solid #007bff;
         }
         .template-selector select {
             width: 100%; padding: 10px; font-size: 16px;
             border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; cursor: pointer;
         }
+
+        /* Matematik Araç Çubuğu Tasarımı */
+        .math-toolbar {
+            background-color: #f1f3f5;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .math-toolbar span {
+            font-weight: bold;
+            color: #555;
+            margin-right: 10px;
+        }
+        .math-btn {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+            color: #333;
+            transition: background 0.2s;
+        }
+        .math-btn:hover { background-color: #e2e6ea; }
+
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
         input[type="text"], input[type="file"], textarea {
@@ -56,6 +98,7 @@
         .btn-primary:hover { background-color: #0056b3; }
         .btn-success { background-color: #28a745; margin-top: 15px; }
         .btn-success:hover { background-color: #218838; }
+        
         .output-container {
             margin-top: 25px; display: none; flex-direction: column;
             border-top: 2px dashed #ccc; padding-top: 20px; overflow-x: auto;
@@ -87,10 +130,25 @@
             <option value="3">Şablon 3: Resimli Dev Format (Alt Alta Tam Genişlik)</option>
         </select>
     </div>
+
+    <div class="math-toolbar">
+        <span>Matematik:</span>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\frac{}{}$', 7)">Kesir (a/b)</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$x^{}$', 4)">Üslü (x²)</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\sqrt{}$', 7)">Kök (√x)</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\times$', 8)">×</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\div$', 6)">÷</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\pm$', 5)">±</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\pi$', 5)">π</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\infty$', 9)">∞</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\leq$', 6)">≤</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\geq$', 6)">≥</button>
+        <button type="button" class="math-btn" onclick="formuleEkle('$\\degree$', 9)">Derece (°)</button>
+    </div>
     
     <div class="form-group">
-        <label for="aciklama">Açıklama (Metin, Paragraf veya Kural):</label>
-        <textarea id="aciklama" placeholder="Sorunun bağlamını buraya yazın..."></textarea>
+        <label for="aciklama">Açıklama / Metin:</label>
+        <textarea id="aciklama" class="math-input" placeholder="Yazmaya başlamak için tıklayın..."></textarea>
     </div>
 
     <div class="form-group" id="resimYuklemeKismi" style="display: none;">
@@ -100,15 +158,15 @@
 
     <div class="form-group">
         <label for="soruKoku">Soru Kökü:</label>
-        <input type="text" id="soruKoku" placeholder="Örn: Yukarıdaki metne/görsele göre hangisi doğrudur?">
+        <input type="text" id="soruKoku" class="math-input" placeholder="Yazmaya başlamak için tıklayın...">
     </div>
 
     <div class="options-container">
         <label>Şıklar (4 Seçenek):</label>
-        <div class="option-group"><label>A)</label> <input type="text" id="sikA" placeholder="A şıkkı"></div>
-        <div class="option-group"><label>B)</label> <input type="text" id="sikB" placeholder="B şıkkı"></div>
-        <div class="option-group"><label>C)</label> <input type="text" id="sikC" placeholder="C şıkkı"></div>
-        <div class="option-group"><label>D)</label> <input type="text" id="sikD" placeholder="D şıkkı"></div>
+        <div class="option-group"><label>A)</label> <input type="text" id="sikA" class="math-input" placeholder="A şıkkı"></div>
+        <div class="option-group"><label>B)</label> <input type="text" id="sikB" class="math-input" placeholder="B şıkkı"></div>
+        <div class="option-group"><label>C)</label> <input type="text" id="sikC" class="math-input" placeholder="C şıkkı"></div>
+        <div class="option-group"><label>D)</label> <input type="text" id="sikD" class="math-input" placeholder="D şıkkı"></div>
     </div>
 
     <button class="btn-primary" onclick="soruyuOlustur()">Soruyu Oluştur</button>
@@ -128,21 +186,42 @@
 
 <script>
     let yuklenenResimVerisi = "";
+    let sonOdaklanilanGirdi = null;
+
+    // Kullanıcının en son hangi metin kutusuna tıkladığını hafızada tutuyoruz
+    document.querySelectorAll('.math-input').forEach(input => {
+        input.addEventListener('focus', function() {
+            sonOdaklanilanGirdi = this;
+        });
+    });
+
+    // Araç çubuğundaki butona basınca çalışan fonksiyon
+    function formuleEkle(eklenecekMetin, imlecPozisyonu) {
+        if (!sonOdaklanilanGirdi) {
+            alert("Lütfen önce formül eklemek istediğiniz kutuya (açıklama, soru veya şık) tıklayın.");
+            return;
+        }
+
+        const girdi = sonOdaklanilanGirdi;
+        const baslangic = girdi.selectionStart;
+        const bitis = girdi.selectionEnd;
+        const mevcutMetin = girdi.value;
+
+        // Metni tam imlecin bulunduğu aralığa ekle
+        girdi.value = mevcutMetin.substring(0, baslangic) + eklenecekMetin + mevcutMetin.substring(bitis);
+        
+        // İmleci, formülün içi (süslü parantezlerin arası) gibi uygun yere konumlandır
+        girdi.selectionStart = girdi.selectionEnd = baslangic + imlecPozisyonu;
+        girdi.focus();
+    }
 
     function sablonAyarla() {
         const secilen = document.getElementById('sablonSecici').value;
         const konteyner = document.getElementById('anaKonteyner');
         
-        // 2 ve 3. şablonlarda resim yükleme alanını göster
         document.getElementById('resimYuklemeKismi').style.display = (secilen === "2" || secilen === "3") ? 'block' : 'none';
-        
-        // 3. şablon seçildiğinde ana div'in genişliğini tam sayfa yap
-        if (secilen === "3") {
-            konteyner.classList.add('buyuk-mod');
-        } else {
-            konteyner.classList.remove('buyuk-mod');
-        }
-
+        if (secilen === "3") { konteyner.classList.add('buyuk-mod'); } 
+        else { konteyner.classList.remove('buyuk-mod'); }
         document.getElementById('ciktiAlani').style.display = 'none';
     }
 
@@ -157,8 +236,8 @@
 
     function soruyuOlustur() {
         const sablon = document.getElementById('sablonSecici').value;
-        
         document.getElementById('ciktiAlani').style.display = 'flex';
+        
         document.getElementById('onizlemeAciklama').innerText = document.getElementById('aciklama').value;
         document.getElementById('onizlemeSoru').innerText = document.getElementById('soruKoku').value;
         
@@ -170,18 +249,22 @@
             resimKutusu.style.display = 'none';
         }
         
-        // Şıklar 4 seçeneğe (A, B, C, D) düşürüldü
         document.getElementById('onizlemeSiklar').innerHTML = `
-            <li><strong>A)</strong> ${document.getElementById('sikA').value}</li>
-            <li><strong>B)</strong> ${document.getElementById('sikB').value}</li>
-            <li><strong>C)</strong> ${document.getElementById('sikC').value}</li>
-            <li><strong>D)</strong> ${document.getElementById('sikD').value}</li>
+            <li><strong>A)</strong> <span>${document.getElementById('sikA').value}</span></li>
+            <li><strong>B)</strong> <span>${document.getElementById('sikB').value}</span></li>
+            <li><strong>C)</strong> <span>${document.getElementById('sikC').value}</span></li>
+            <li><strong>D)</strong> <span>${document.getElementById('sikD').value}</span></li>
         `;
+
+        if (window.MathJax) {
+            MathJax.typesetPromise([document.getElementById('soruKarti')]).catch(function (err) {
+                console.log('MathJax Dönüştürme Hatası: ', err.message);
+            });
+        }
     }
 
     function resimOlarakIndir() {
         const sablon = document.getElementById('sablonSecici').value;
-        // 3. Şablon için kalite (scale) oranını 4'e çıkararak devasa çözünürlük sağlıyoruz. Diğerleri için 3 yeterli.
         const kaliteOrani = (sablon === "3") ? 4 : 3;
 
         html2canvas(document.getElementById('soruKarti'), { 
