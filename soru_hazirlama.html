@@ -13,7 +13,11 @@
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']]
             },
-            svg: { fontCache: 'global' }
+            svg: { 
+                // HTML2CANVAS HATASINI ÇÖZEN KRİTİK AYAR: 
+                // fontCache 'none' yapılmalı ki resim çekilirken semboller kaybolmasın.
+                fontCache: 'none' 
+            }
         };
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
@@ -39,42 +43,28 @@
         .container.buyuk-mod { max-width: 1800px; }
         h2 { color: #333; text-align: center; margin-top: 0; }
         
+        .selections-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
         .template-selector {
             background-color: #e8f4fd; padding: 15px; border-radius: 4px;
-            margin-bottom: 20px; border-left: 5px solid #007bff;
+            border-left: 5px solid #007bff; flex: 1;
         }
         .template-selector select {
             width: 100%; padding: 10px; font-size: 16px;
             border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; cursor: pointer;
         }
 
-        /* Matematik Araç Çubuğu Tasarımı */
         .math-toolbar {
-            background-color: #f1f3f5;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-            margin-bottom: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
+            background-color: #f1f3f5; padding: 10px; border-radius: 4px;
+            border: 1px solid #ddd; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
         }
-        .math-toolbar span {
-            font-weight: bold;
-            color: #555;
-            margin-right: 10px;
-        }
+        .math-toolbar span { font-weight: bold; color: #555; margin-right: 10px; }
         .math-btn {
-            background-color: #fff;
-            border: 1px solid #ccc;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 15px;
-            font-weight: bold;
-            color: #333;
-            transition: background 0.2s;
+            background-color: #fff; border: 1px solid #ccc; padding: 8px 12px;
+            border-radius: 4px; cursor: pointer; font-size: 15px; font-weight: bold; color: #333; transition: background 0.2s;
         }
         .math-btn:hover { background-color: #e2e6ea; }
 
@@ -90,6 +80,7 @@
         }
         .option-group { display: flex; align-items: center; margin-bottom: 10px; }
         .option-group label { margin: 0 10px 0 0; width: 20px; }
+        
         .btn-primary, .btn-success {
             width: 100%; padding: 15px; color: white; border: none;
             border-radius: 4px; font-size: 18px; cursor: pointer; font-weight: bold;
@@ -110,9 +101,22 @@
         .soru-karti p { margin-top: 0; }
         .resim-alani { text-align: center; margin-bottom: 30px; display: none; }
         .resim-alani img { max-width: 100%; max-height: 800px; object-fit: contain; }
+        
+        /* ŞIK DİZİLİMİ CSS KODLARI */
         .soru-karti ul {
-            list-style-type: none; padding-left: 0; margin-bottom: 0;
-            display: flex; justify-content: space-between; width: 100%; margin-top: 40px;
+            list-style-type: none; padding-left: 0; margin-bottom: 0; margin-top: 40px;
+        }
+        /* 1. Yan Yana Format */
+        .dizilim-yanyana {
+            display: flex; justify-content: space-between; width: 100%;
+        }
+        /* 2. Alt Alta Format */
+        .dizilim-altalta {
+            display: flex; flex-direction: column; gap: 20px; width: 100%;
+        }
+        /* 3. İkili (Grid) Format */
+        .dizilim-ikili {
+            display: grid; grid-template-columns: 1fr 1fr; row-gap: 30px; column-gap: 20px; width: 100%;
         }
         .soru-karti li { margin-bottom: 0; }
     </style>
@@ -122,13 +126,24 @@
 <div class="container" id="anaKonteyner">
     <h2>Soru Oluşturucu Aracı</h2>
 
-    <div class="template-selector">
-        <label for="sablonSecici">Kullanılacak Şablonu Seçiniz:</label>
-        <select id="sablonSecici" onchange="sablonAyarla()">
-            <option value="1">Şablon 1: Klasik Çoktan Seçmeli (Yan Yana Yarım Sayfa)</option>
-            <option value="2">Şablon 2: Resimli Çoktan Seçmeli (Yan Yana Yarım Sayfa)</option>
-            <option value="3">Şablon 3: Resimli Dev Format (Alt Alta Tam Genişlik)</option>
-        </select>
+    <div class="selections-container">
+        <div class="template-selector">
+            <label for="sablonSecici">Kullanılacak Şablonu Seçiniz:</label>
+            <select id="sablonSecici" onchange="arayuzAyarla()">
+                <option value="1">Şablon 1: Klasik Çoktan Seçmeli</option>
+                <option value="2">Şablon 2: Resimli Çoktan Seçmeli</option>
+                <option value="3">Şablon 3: Resimli Dev Format (Tam Genişlik)</option>
+            </select>
+        </div>
+        
+        <div class="template-selector" style="border-left-color: #28a745; background-color: #e9f7ef;">
+            <label for="dizilimSecici">Şık Dizilimini Seçiniz:</label>
+            <select id="dizilimSecici">
+                <option value="yanyana">Hepsi Yan Yana (A B C D)</option>
+                <option value="altalta">Hepsi Alt Alta</option>
+                <option value="ikili">İkili İkili (Üstte A-B, Altta C-D)</option>
+            </select>
+        </div>
     </div>
 
     <div class="math-toolbar">
@@ -188,17 +203,15 @@
     let yuklenenResimVerisi = "";
     let sonOdaklanilanGirdi = null;
 
-    // Kullanıcının en son hangi metin kutusuna tıkladığını hafızada tutuyoruz
     document.querySelectorAll('.math-input').forEach(input => {
         input.addEventListener('focus', function() {
             sonOdaklanilanGirdi = this;
         });
     });
 
-    // Araç çubuğundaki butona basınca çalışan fonksiyon
     function formuleEkle(eklenecekMetin, imlecPozisyonu) {
         if (!sonOdaklanilanGirdi) {
-            alert("Lütfen önce formül eklemek istediğiniz kutuya (açıklama, soru veya şık) tıklayın.");
+            alert("Lütfen önce formül eklemek istediğiniz kutuya tıklayın.");
             return;
         }
 
@@ -207,15 +220,12 @@
         const bitis = girdi.selectionEnd;
         const mevcutMetin = girdi.value;
 
-        // Metni tam imlecin bulunduğu aralığa ekle
         girdi.value = mevcutMetin.substring(0, baslangic) + eklenecekMetin + mevcutMetin.substring(bitis);
-        
-        // İmleci, formülün içi (süslü parantezlerin arası) gibi uygun yere konumlandır
         girdi.selectionStart = girdi.selectionEnd = baslangic + imlecPozisyonu;
         girdi.focus();
     }
 
-    function sablonAyarla() {
+    function arayuzAyarla() {
         const secilen = document.getElementById('sablonSecici').value;
         const konteyner = document.getElementById('anaKonteyner');
         
@@ -236,6 +246,8 @@
 
     function soruyuOlustur() {
         const sablon = document.getElementById('sablonSecici').value;
+        const dizilim = document.getElementById('dizilimSecici').value;
+        
         document.getElementById('ciktiAlani').style.display = 'flex';
         
         document.getElementById('onizlemeAciklama').innerText = document.getElementById('aciklama').value;
@@ -249,13 +261,19 @@
             resimKutusu.style.display = 'none';
         }
         
-        document.getElementById('onizlemeSiklar').innerHTML = `
+        // Şıkların dizilimini ayarlayan CSS sınıfını ekliyoruz
+        const ulElementi = document.getElementById('onizlemeSiklar');
+        ulElementi.className = ''; // Eski sınıfları temizle
+        ulElementi.classList.add('dizilim-' + dizilim);
+        
+        ulElementi.innerHTML = `
             <li><strong>A)</strong> <span>${document.getElementById('sikA').value}</span></li>
             <li><strong>B)</strong> <span>${document.getElementById('sikB').value}</span></li>
             <li><strong>C)</strong> <span>${document.getElementById('sikC').value}</span></li>
             <li><strong>D)</strong> <span>${document.getElementById('sikD').value}</span></li>
         `;
 
+        // Matematik formüllerini tetikle
         if (window.MathJax) {
             MathJax.typesetPromise([document.getElementById('soruKarti')]).catch(function (err) {
                 console.log('MathJax Dönüştürme Hatası: ', err.message);
@@ -273,7 +291,7 @@
         }).then(canvas => {
             const link = document.createElement('a');
             link.href = canvas.toDataURL("image/png");
-            link.download = `soru-sablon${sablon}.png`;
+            link.download = `soru.png`;
             link.click();
         });
     }
