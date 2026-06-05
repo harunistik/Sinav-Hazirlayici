@@ -23,6 +23,7 @@
         .upload-group { display: flex; flex-direction: column; gap: 5px; background: #f8f9fa; border: 1px dashed #adb5bd; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; }
         .upload-group input { font-size: 12px; cursor: pointer; max-width: 180px;}
         .upload-group.full-page { border-color: var(--main-blue); background: #eef2ff; }
+        .upload-group.mixed-page { border-color: var(--main-red); background: #fff1f1; }
 
         .controls button { padding: 10px 15px; background-color: var(--main-blue); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;}
         .controls button:hover { background-color: #110c44; }
@@ -90,6 +91,8 @@
         
         .wrapper-normal::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: var(--main-blue); transform: translateX(-50%); z-index: 1; }
         .wrapper-full::after { display: none; }
+        .wrapper-mixed { flex-direction: column; gap: 4mm; }
+        .wrapper-mixed::after { display: none; }
 
         .column { height: 100%; display: flex; flex-direction: column; justify-content: flex-start; min-height: 0; }
         
@@ -97,11 +100,18 @@
         .left-column { width: 50%; padding-right: 4mm; box-sizing: border-box; }
         .right-column { width: 50%; padding-left: 4mm; box-sizing: border-box; }
         
-        .full-column { width: 100%; padding: 0 5mm; box-sizing: border-box; } 
+        .full-column { width: 100%; padding: 0 5mm; box-sizing: border-box; }
+        .mixed-large-column { width: 100%; height: 42%; padding: 0 5mm; box-sizing: border-box; flex-shrink: 0; }
+        .mixed-small-wrapper { flex: 1 1 0%; display: flex; position: relative; min-height: 0; overflow: hidden; }
+        .mixed-small-wrapper::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: var(--main-blue); transform: translateX(-50%); z-index: 1; }
+        .mixed-small-column { width: 50%; height: 100%; box-sizing: border-box; }
+        .mixed-small-left { padding-right: 4mm; }
+        .mixed-small-right { padding-left: 4mm; }
 
         /* --- SORU DÜZENLERİ --- */
         .question-item { margin-bottom: var(--soru-bosluk); display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
         .layout-full .question-item { margin-bottom: calc(var(--soru-bosluk) + 2.5cm); }
+        .layout-mixed .mixed-large-column .question-item { margin-bottom: 0.5cm; }
         
         .q-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 25px; padding-top: 2px; }
         .question-number { font-weight: bold; font-size: 14px; }
@@ -111,6 +121,9 @@
         .question-image { flex: 1; display: flex; justify-content: flex-start; }
         .question-image img { max-width: 100%; max-height: 220mm; object-fit: contain; display: block; }
         .layout-full .question-image img { max-height: 120mm; margin: 0 auto; } /* Tam sayfa görselleri ortalar */
+        .layout-mixed .mixed-large-column .question-image { justify-content: center; }
+        .layout-mixed .mixed-large-column .question-image img { max-height: 110mm; margin: 0 auto; }
+        .layout-mixed .mixed-small-column .question-image img { max-height: 120mm; }
 
         /* --- ALT BİLGİ (FOOTER) --- */
         .footer-line { 
@@ -196,6 +209,11 @@
             <input type="file" id="fullImageUploader" multiple accept="image/png, image/jpeg, image/jpg">
         </div>
 
+        <div class="upload-group mixed-page">
+            <label style="color: var(--main-red);">Karma (İlk Büyük + Küçükler):</label>
+            <input type="file" id="mixedImageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+        </div>
+
         <button onclick="window.print()">PDF Çıktı Al</button>
         <button class="clear-btn" onclick="clearAll()">Tümünü Temizle</button>
         <span id="loadingIndicator">İşleniyor...</span>
@@ -224,9 +242,20 @@
             page.className = `paper layout-${layoutType}`;
             page.id = `page-${pageNum}`;
             
-            let columnsHtml = layoutType === 'normal' 
-                ? `<div class="column left-column" id="page-${pageNum}-left"></div><div class="column right-column" id="page-${pageNum}-right"></div>`
-                : `<div class="column full-column" id="page-${pageNum}-full"></div>`;
+            let columnsHtml = '';
+            if (layoutType === 'normal') {
+                columnsHtml = `<div class="column left-column" id="page-${pageNum}-left"></div><div class="column right-column" id="page-${pageNum}-right"></div>`;
+            } else if (layoutType === 'mixed') {
+                columnsHtml = `
+                    <div class="column mixed-large-column" id="page-${pageNum}-large"></div>
+                    <div class="mixed-small-wrapper">
+                        <div class="column mixed-small-column mixed-small-left" id="page-${pageNum}-left"></div>
+                        <div class="column mixed-small-column mixed-small-right" id="page-${pageNum}-right"></div>
+                    </div>
+                `;
+            } else {
+                columnsHtml = `<div class="column full-column" id="page-${pageNum}-full"></div>`;
+            }
             
             let headerHtml = '';
             
@@ -304,6 +333,7 @@
 
         document.getElementById('imageUploader').addEventListener('change', (e) => handleUpload(e, 'normal'));
         document.getElementById('fullImageUploader').addEventListener('change', (e) => handleUpload(e, 'full'));
+        document.getElementById('mixedImageUploader').addEventListener('change', handleMixedUpload);
 
         async function handleUpload(e, layoutType) {
             const files = Array.from(e.target.files);
@@ -317,7 +347,29 @@
                 }
             }
             e.target.value = ''; 
-            await reRenderExam(); 
+            await reRenderExam();
+            toggleUI(false);
+        }
+
+        async function handleMixedUpload(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            toggleUI(true);
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (file.type.startsWith('image/')) {
+                    const imgSrc = await readFileAsDataURL(file);
+                    uploadedImages.push({
+                        src: imgSrc,
+                        layout: 'mixed',
+                        mixedRole: i === 0 ? 'large' : 'small'
+                    });
+                }
+            }
+
+            e.target.value = '';
+            await reRenderExam();
             toggleUI(false);
         }
 
@@ -353,7 +405,7 @@
             currentPage = 1;
             
             currentPageType = uploadedImages.length > 0 ? uploadedImages[0].layout : 'normal';
-            currentSide = currentPageType === 'normal' ? 'left' : 'full';
+            currentSide = getInitialSide(currentPageType);
             
             document.getElementById('examContainer').appendChild(createPage(1, currentPageType));
 
@@ -369,7 +421,8 @@
         async function placeQuestionInDOM(index) {
             const qData = uploadedImages[index];
             const imgSrc = qData.src;
-            const targetLayout = qData.layout; 
+            const targetLayout = qData.layout;
+            const targetSide = getInitialSide(targetLayout, qData);
             const qNum = index + 1;
 
             await new Promise(resolve => {
@@ -393,11 +446,17 @@
                     }
                     
                     currentPageType = targetLayout;
-                    currentSide = targetLayout === 'normal' ? 'left' : 'full';
+                    currentSide = targetSide;
                     
                     if (!document.getElementById(`page-${currentPage}`)) {
                         document.getElementById('examContainer').appendChild(createPage(currentPage, currentPageType));
                     }
+                }
+
+                if (currentPageType === 'mixed' && qData.mixedRole === 'large') {
+                    currentSide = targetSide;
+                } else if (currentPageType === 'mixed' && currentSide === 'large') {
+                    currentSide = targetSide;
                 }
 
                 let targetColumn = document.getElementById(`page-${currentPage}-${currentSide}`);
@@ -424,7 +483,13 @@
                 if (currentPageType === 'full' && targetColumn.children.length > 2) {
                     targetColumn.removeChild(qDiv);
                     advancePagePointer(currentPageType);
-                    continue; 
+                    continue;
+                }
+
+                if (currentPageType === 'mixed' && qData.mixedRole === 'large' && targetColumn.children.length > 1) {
+                    targetColumn.removeChild(qDiv);
+                    advancePagePointer(currentPageType, qData);
+                    continue;
                 }
 
                 const colRect = targetColumn.getBoundingClientRect();
@@ -435,21 +500,27 @@
                 if (qRect.bottom > colRect.bottom - 2) {
                     if (targetColumn.children.length === 1) {
                         placed = true;
-                        advancePagePointer(currentPageType);
+                        advancePagePointer(currentPageType, qData);
                     } else {
-                        targetColumn.removeChild(qDiv); 
-                        advancePagePointer(currentPageType); 
+                        targetColumn.removeChild(qDiv);
+                        advancePagePointer(currentPageType, qData);
                     }
                 } else {
-                    placed = true; 
+                    placed = true;
                 }
             }
         }
 
-        function advancePagePointer(layout) {
+        function getInitialSide(layout, qData = {}) {
+            if (layout === 'normal') return 'left';
+            if (layout === 'mixed') return qData.mixedRole === 'small' ? 'left' : 'large';
+            return 'full';
+        }
+
+        function advancePagePointer(layout, qData = {}) {
             if (layout === 'normal') {
                 if (currentSide === 'left') {
-                    currentSide = 'right'; 
+                    currentSide = 'right';
                 } else {
                     currentPage++; 
                     currentSide = 'left';
@@ -459,12 +530,21 @@
                 currentPage++;
                 currentSide = 'full';
                 document.getElementById('examContainer').appendChild(createPage(currentPage, layout));
+            } else if (layout === 'mixed') {
+                if (qData.mixedRole === 'small' && currentSide === 'left') {
+                    currentSide = 'right';
+                } else {
+                    currentPage++;
+                    currentSide = getInitialSide(layout, qData);
+                    document.getElementById('examContainer').appendChild(createPage(currentPage, layout));
+                }
             }
         }
 
         function toggleUI(disable) {
             document.getElementById('imageUploader').disabled = disable;
             document.getElementById('fullImageUploader').disabled = disable;
+            document.getElementById('mixedImageUploader').disabled = disable;
             document.getElementById('spacingInput').disabled = disable;
             document.getElementById('videoLink').disabled = disable;
             document.getElementById('subHeaderInfo').disabled = disable;
