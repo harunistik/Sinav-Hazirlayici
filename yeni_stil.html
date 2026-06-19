@@ -24,6 +24,7 @@
         .upload-group input { font-size: 12px; cursor: pointer; max-width: 180px;}
         .upload-group.full-page { border-color: var(--main-blue); background: #eef2ff; }
         .upload-group.mixed-page { border-color: var(--main-red); background: #fff1f1; }
+        .upload-group.mixed-page-alt { border-color: #198754; background: #effaf3; }
 
         .controls button { padding: 10px 15px; background-color: var(--main-blue); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;}
         .controls button:hover { background-color: #110c44; }
@@ -91,8 +92,8 @@
         
         .wrapper-normal::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: var(--main-blue); transform: translateX(-50%); z-index: 1; }
         .wrapper-full::after { display: none; }
-        .wrapper-mixed { flex-direction: column; gap: 4mm; }
-        .wrapper-mixed::after { display: none; }
+        .wrapper-mixed-top, .wrapper-mixed-bottom { flex-direction: column; gap: 4mm; }
+        .wrapper-mixed-top::after, .wrapper-mixed-bottom::after { display: none; }
 
         .column { height: 100%; display: flex; flex-direction: column; justify-content: flex-start; min-height: 0; }
         
@@ -101,8 +102,10 @@
         .right-column { width: 50%; padding-left: 4mm; box-sizing: border-box; }
         
         .full-column { width: 100%; padding: 0 5mm; box-sizing: border-box; }
-        .mixed-large-column { width: 100%; height: 42%; padding: 0 5mm; box-sizing: border-box; flex-shrink: 0; }
-        .mixed-small-wrapper { flex: 1 1 0%; display: flex; position: relative; min-height: 0; overflow: hidden; }
+        .mixed-large-column { width: 100%; flex: 1 1 0%; padding: 0 5mm; box-sizing: border-box; }
+        .mixed-small-wrapper { flex: 0 0 34%; display: flex; position: relative; min-height: 0; overflow: hidden; }
+        .layout-mixed-bottom .mixed-large-column { padding-top: 6mm; }
+        .layout-mixed-bottom .mixed-small-wrapper { flex-basis: 39%; }
         .mixed-small-wrapper::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background-color: var(--main-blue); transform: translateX(-50%); z-index: 1; }
         .mixed-small-column { width: 50%; height: 100%; box-sizing: border-box; }
         .mixed-small-left { padding-right: 4mm; }
@@ -111,7 +114,8 @@
         /* --- SORU DÜZENLERİ --- */
         .question-item { margin-bottom: var(--soru-bosluk); display: flex; align-items: flex-start; gap: 8px; flex-shrink: 0; }
         .layout-full .question-item { margin-bottom: calc(var(--soru-bosluk) + 2.5cm); }
-        .layout-mixed .mixed-large-column .question-item { margin-bottom: 0.5cm; }
+        .layout-mixed-top .mixed-large-column .question-item,
+        .layout-mixed-bottom .mixed-large-column .question-item { margin-bottom: 0.5cm; }
         
         .q-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 25px; padding-top: 2px; }
         .question-number { font-weight: bold; font-size: 14px; }
@@ -121,9 +125,12 @@
         .question-image { flex: 1; display: flex; justify-content: flex-start; }
         .question-image img { max-width: 100%; max-height: 220mm; object-fit: contain; display: block; }
         .layout-full .question-image img { max-height: 120mm; margin: 0 auto; } /* Tam sayfa görselleri ortalar */
-        .layout-mixed .mixed-large-column .question-image { justify-content: center; }
-        .layout-mixed .mixed-large-column .question-image img { max-height: 110mm; margin: 0 auto; }
-        .layout-mixed .mixed-small-column .question-image img { max-height: 120mm; }
+        .layout-mixed-top .mixed-large-column .question-image,
+        .layout-mixed-bottom .mixed-large-column .question-image { justify-content: center; }
+        .layout-mixed-top .mixed-large-column .question-image img,
+        .layout-mixed-bottom .mixed-large-column .question-image img { max-height: 110mm; margin: 0 auto; }
+        .layout-mixed-top .mixed-small-column .question-image img,
+        .layout-mixed-bottom .mixed-small-column .question-image img { max-height: 82mm; }
 
         /* --- ALT BİLGİ (FOOTER) --- */
         .footer-line { 
@@ -210,8 +217,13 @@
         </div>
 
         <div class="upload-group mixed-page">
-            <label style="color: var(--main-red);">Karma (İlk Büyük + Küçükler):</label>
-            <input type="file" id="mixedImageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+            <label style="color: var(--main-red);">Karma Ust Buyuk (1 Buyuk + 2 Alt):</label>
+            <input type="file" id="mixedTopImageUploader" multiple accept="image/png, image/jpeg, image/jpg">
+        </div>
+
+        <div class="upload-group mixed-page-alt">
+            <label style="color: #198754;">Karma Alt Buyuk (2 Ust + 1 Buyuk):</label>
+            <input type="file" id="mixedBottomImageUploader" multiple accept="image/png, image/jpeg, image/jpg">
         </div>
 
         <button onclick="window.print()">PDF Çıktı Al</button>
@@ -245,14 +257,17 @@
             let columnsHtml = '';
             if (layoutType === 'normal') {
                 columnsHtml = `<div class="column left-column" id="page-${pageNum}-left"></div><div class="column right-column" id="page-${pageNum}-right"></div>`;
-            } else if (layoutType === 'mixed') {
-                columnsHtml = `
-                    <div class="column mixed-large-column" id="page-${pageNum}-large"></div>
+            } else if (layoutType === 'mixed-top' || layoutType === 'mixed-bottom') {
+                const smallColumnsHtml = `
                     <div class="mixed-small-wrapper">
                         <div class="column mixed-small-column mixed-small-left" id="page-${pageNum}-left"></div>
                         <div class="column mixed-small-column mixed-small-right" id="page-${pageNum}-right"></div>
                     </div>
                 `;
+                const largeColumnHtml = `<div class="column mixed-large-column" id="page-${pageNum}-large"></div>`;
+                columnsHtml = layoutType === 'mixed-top'
+                    ? `${largeColumnHtml}${smallColumnsHtml}`
+                    : `${smallColumnsHtml}${largeColumnHtml}`;
             } else {
                 columnsHtml = `<div class="column full-column" id="page-${pageNum}-full"></div>`;
             }
@@ -333,7 +348,8 @@
 
         document.getElementById('imageUploader').addEventListener('change', (e) => handleUpload(e, 'normal'));
         document.getElementById('fullImageUploader').addEventListener('change', (e) => handleUpload(e, 'full'));
-        document.getElementById('mixedImageUploader').addEventListener('change', handleMixedUpload);
+        document.getElementById('mixedTopImageUploader').addEventListener('change', (e) => handleMixedUpload(e, 'mixed-top'));
+        document.getElementById('mixedBottomImageUploader').addEventListener('change', (e) => handleMixedUpload(e, 'mixed-bottom'));
 
         async function handleUpload(e, layoutType) {
             const files = Array.from(e.target.files);
@@ -351,7 +367,7 @@
             toggleUI(false);
         }
 
-        async function handleMixedUpload(e) {
+        async function handleMixedUpload(e, layoutType) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             toggleUI(true);
@@ -360,10 +376,12 @@
                 const file = files[i];
                 if (file.type.startsWith('image/')) {
                     const imgSrc = await readFileAsDataURL(file);
+                    const groupIndex = i % 3;
+                    const isLarge = layoutType === 'mixed-top' ? groupIndex === 0 : groupIndex === 2;
                     uploadedImages.push({
                         src: imgSrc,
-                        layout: 'mixed',
-                        mixedRole: i === 0 ? 'large' : 'small'
+                        layout: layoutType,
+                        mixedRole: isLarge ? 'large' : 'small'
                     });
                 }
             }
@@ -453,9 +471,9 @@
                     }
                 }
 
-                if (currentPageType === 'mixed' && qData.mixedRole === 'large') {
+                if (isMixedLayout(currentPageType) && qData.mixedRole === 'large') {
                     currentSide = targetSide;
-                } else if (currentPageType === 'mixed' && currentSide === 'large') {
+                } else if (isMixedLayout(currentPageType) && currentSide === 'large') {
                     currentSide = targetSide;
                 }
 
@@ -486,7 +504,7 @@
                     continue;
                 }
 
-                if (currentPageType === 'mixed' && qData.mixedRole === 'large' && targetColumn.children.length > 1) {
+                if (isMixedLayout(currentPageType) && targetColumn.children.length > 1) {
                     targetColumn.removeChild(qDiv);
                     advancePagePointer(currentPageType, qData);
                     continue;
@@ -500,21 +518,46 @@
                 if (qRect.bottom > colRect.bottom - 2) {
                     if (targetColumn.children.length === 1) {
                         placed = true;
-                        advancePagePointer(currentPageType, qData);
+                        if (isMixedLayout(currentPageType)) {
+                            advancePointerAfterSuccessfulPlacement(currentPageType, qData);
+                        } else {
+                            advancePagePointer(currentPageType, qData);
+                        }
                     } else {
                         targetColumn.removeChild(qDiv);
                         advancePagePointer(currentPageType, qData);
                     }
                 } else {
                     placed = true;
+                    advancePointerAfterSuccessfulPlacement(currentPageType, qData);
                 }
             }
         }
 
+        function isMixedLayout(layout) {
+            return layout === 'mixed-top' || layout === 'mixed-bottom';
+        }
+
         function getInitialSide(layout, qData = {}) {
             if (layout === 'normal') return 'left';
-            if (layout === 'mixed') return qData.mixedRole === 'small' ? 'left' : 'large';
+            if (isMixedLayout(layout)) return qData.mixedRole === 'small' ? 'left' : 'large';
             return 'full';
+        }
+
+        function advancePointerAfterSuccessfulPlacement(layout, qData = {}) {
+            if (!isMixedLayout(layout)) return;
+
+            if (qData.mixedRole === 'small') {
+                if (currentSide === 'left') {
+                    currentSide = 'right';
+                } else if (layout === 'mixed-top') {
+                    currentPage++;
+                    currentSide = 'large';
+                }
+            } else if (layout === 'mixed-bottom') {
+                currentPage++;
+                currentSide = 'left';
+            }
         }
 
         function advancePagePointer(layout, qData = {}) {
@@ -530,7 +573,7 @@
                 currentPage++;
                 currentSide = 'full';
                 document.getElementById('examContainer').appendChild(createPage(currentPage, layout));
-            } else if (layout === 'mixed') {
+            } else if (isMixedLayout(layout)) {
                 if (qData.mixedRole === 'small' && currentSide === 'left') {
                     currentSide = 'right';
                 } else {
@@ -544,7 +587,8 @@
         function toggleUI(disable) {
             document.getElementById('imageUploader').disabled = disable;
             document.getElementById('fullImageUploader').disabled = disable;
-            document.getElementById('mixedImageUploader').disabled = disable;
+            document.getElementById('mixedTopImageUploader').disabled = disable;
+            document.getElementById('mixedBottomImageUploader').disabled = disable;
             document.getElementById('spacingInput').disabled = disable;
             document.getElementById('videoLink').disabled = disable;
             document.getElementById('subHeaderInfo').disabled = disable;
